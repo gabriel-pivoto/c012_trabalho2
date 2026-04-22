@@ -1,0 +1,65 @@
+[
+  {
+    "id": "P1",
+    "name": "Paciente Ana",
+    "arrival_time": 0,
+    "burst_time": 10,
+    "priority": 9,
+    "severity_label": "grave",
+    "max_wait_tolerated": 2
+  },
+  {
+    "id": "P2",
+    "name": "Paciente Bruno",
+    "arrival_time": 0,
+    "burst_time": 2,
+    "priority": 3,
+    "severity_label": "leve",
+    "max_wait_tolerated": 8
+  },
+  {
+    "id": "P3",
+    "name": "Paciente Carla",
+    "arrival_time": 1,
+    "burst_time": 1,
+    "priority": 2,
+    "severity_label": "leve",
+    "max_wait_tolerated": 10
+  },
+  {
+    "id": "P4",
+    "name": "Paciente Daniel",
+    "arrival_time": 2,
+    "burst_time": 4,
+    "priority": 8,
+    "severity_label": "grave",
+    "max_wait_tolerated": 3
+  },
+  {
+    "id": "P5",
+    "name": "Paciente Elisa",
+    "arrival_time": 3,
+    "burst_time": 3,
+    "priority": 3,
+    "severity_label": "moderado",
+    "max_wait_tolerated": 6
+  },
+  {
+    "id": "P6",
+    "name": "Paciente Fabio",
+    "arrival_time": 6,
+    "burst_time": 2,
+    "priority": 7,
+    "severity_label": "moderado",
+    "max_wait_tolerated": 4
+  },
+  {
+    "id": "P7",
+    "name": "Paciente Gina",
+    "arrival_time": 25,
+    "burst_time": 2,
+    "priority": 5,
+    "severity_label": "moderado",
+    "max_wait_tolerated": 5
+  }
+]

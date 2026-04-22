@@ -1,0 +1,151 @@
+from __future__ import annotations
+
+import argparse
+from collections.abc import Callable, Sequence
+from pathlib import Path
+from typing import Any
+
+from gantt import render_gantt
+from metrics import build_average_rows, build_comparison_analysis, build_result_rows
+from models import Process, ScheduleResult
+from sample_data import get_default_processes, load_processes_from_json
+from schedulers import schedule_priority, schedule_sjf
+
+
+Column = tuple[str, Callable[[Any], str], str]
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Simulacao didatica de escalonamento de CPU com SJF e Priority Scheduling."
+    )
+    parser.add_argument(
+        "--json",
+        type=Path,
+        help="Carrega processos a partir de um arquivo JSON.",
+    )
+    return parser
+
+
+def run_cli(argv: Sequence[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    processes = load_processes_from_json(args.json) if args.json else get_default_processes()
+    report = build_report(processes)
+    print(report)
+    return 0
+
+
+def build_report(processes: Sequence[Process]) -> str:
+    sjf_result = schedule_sjf(processes)
+    ps_result = schedule_priority(processes)
+    lines: list[str] = [
+        "SIMULACAO EDUCACIONAL DE ESCALONAMENTO DE CPU",
+        "Analogia hospitalar opcional: nomes podem representar pacientes, mas a logica e de processos.",
+        "",
+        _section_title("Entrada original"),
+        _render_input_table(processes),
+        "",
+        _render_schedule_section(sjf_result),
+        "",
+        _render_schedule_section(ps_result),
+        "",
+        _section_title("Comparacao final"),
+    ]
+    lines.extend(f"- {line}" for line in build_comparison_analysis(processes, sjf_result, ps_result))
+    return "\n".join(lines)
+
+
+def _render_schedule_section(result: ScheduleResult) -> str:
+    average_rows = build_average_rows(result)
+    average_text = "\n".join(f"- {label}: {value:.2f}" for label, value in average_rows)
+
+    lines = [
+        _section_title(result.algorithm_name),
+        f"Ordem de execucao: {' -> '.join(result.execution_order)}",
+        "Decisoes do escalonador:",
+    ]
+    lines.extend(f"- {decision}" for decision in result.decision_log)
+    lines.extend(
+        [
+            "",
+            "Grafico de Gantt:",
+            render_gantt(result.gantt_blocks),
+            "",
+            "Tabela final:",
+            _render_result_table(result),
+            "",
+            "Medias:",
+            average_text,
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _render_input_table(processes: Sequence[Process]) -> str:
+    include_severity = any(process.severity_label is not None for process in processes)
+    include_max_wait = any(process.max_wait_tolerated is not None for process in processes)
+
+    columns: list[Column] = [
+        ("ID", lambda process: process.id, "<"),
+        ("Nome", lambda process: process.name, "<"),
+        ("Chegada", lambda process: str(process.arrival_time), ">"),
+        ("Burst", lambda process: str(process.burst_time), ">"),
+        ("Prio", lambda process: str(process.priority), ">"),
+    ]
+
+    if include_severity:
+        columns.append(("Categoria", lambda process: process.severity_label or "-", "<"))
+    if include_max_wait:
+        columns.append(
+            ("Espera max.", lambda process: _format_optional_int(process.max_wait_tolerated), ">")
+        )
+
+    return _render_table(processes, columns)
+
+
+def _render_result_table(result: ScheduleResult) -> str:
+    rows = build_result_rows(result)
+    columns: list[Column] = [
+        ("ID", lambda row: str(row["id"]), "<"),
+        ("Nome", lambda row: str(row["name"]), "<"),
+        ("Chegada", lambda row: str(row["arrival_time"]), ">"),
+        ("Burst", lambda row: str(row["burst_time"]), ">"),
+        ("Prio", lambda row: str(row["priority"]), ">"),
+        ("Inicio", lambda row: str(row["start_time"]), ">"),
+        ("Fim", lambda row: str(row["finish_time"]), ">"),
+        ("Espera", lambda row: str(row["waiting_time"]), ">"),
+        ("Turnaround", lambda row: str(row["turnaround_time"]), ">"),
+        ("Resposta", lambda row: str(row["response_time"]), ">"),
+    ]
+    return _render_table(rows, columns)
+
+
+def _render_table(rows: Sequence[Any], columns: Sequence[Column]) -> str:
+    prepared_rows = [[getter(row) for _, getter, _ in columns] for row in rows]
+    widths: list[int] = []
+
+    for index, (header, _, _) in enumerate(columns):
+        column_width = len(header)
+        for row in prepared_rows:
+            column_width = max(column_width, len(row[index]))
+        widths.append(column_width)
+
+    def format_row(values: Sequence[str]) -> str:
+        parts: list[str] = []
+        for value, width, (_, _, alignment) in zip(values, widths, columns):
+            parts.append(value.rjust(width) if alignment == ">" else value.ljust(width))
+        return " | ".join(parts)
+
+    header = format_row([title for title, _, _ in columns])
+    separator = "-+-".join("-" * width for width in widths)
+    body = "\n".join(format_row(row) for row in prepared_rows)
+    return f"{header}\n{separator}\n{body}"
+
+
+def _section_title(title: str) -> str:
+    underline = "-" * len(title)
+    return f"{title}\n{underline}"
+
+
+def _format_optional_int(value: int | None) -> str:
+    return "-" if value is None else str(value)
