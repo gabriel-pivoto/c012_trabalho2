@@ -113,6 +113,19 @@ Execução carregando um JSON:
 python main.py --json data/example_processes.json
 ```
 
+Execução em modo interativo:
+
+```bash
+python main.py --interactive
+```
+
+No modo interativo, a CLI pede:
+
+- nome da pessoa/processo;
+- tempo de chegada (opcional, com padrão `0`);
+- tempo gasto (`burst_time`);
+- prioridade.
+
 Executando os testes:
 
 ```bash

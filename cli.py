@@ -19,17 +19,23 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Simulacao didatica de escalonamento de CPU com SJF e Priority Scheduling."
     )
-    parser.add_argument(
+    source_group = parser.add_mutually_exclusive_group()
+    source_group.add_argument(
         "--json",
         type=Path,
         help="Carrega processos a partir de um arquivo JSON.",
+    )
+    source_group.add_argument(
+        "--interactive",
+        action="store_true",
+        help="Permite cadastrar processos manualmente pela CLI.",
     )
     return parser
 
 
 def run_cli(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    processes = load_processes_from_json(args.json) if args.json else get_default_processes()
+    processes = _load_processes_from_cli(args)
     report = build_report(processes)
     print(report)
     return 0
@@ -149,3 +155,92 @@ def _section_title(title: str) -> str:
 
 def _format_optional_int(value: int | None) -> str:
     return "-" if value is None else str(value)
+
+
+def _load_processes_from_cli(args: argparse.Namespace) -> list[Process]:
+    if args.json:
+        return load_processes_from_json(args.json)
+    if args.interactive:
+        return _prompt_processes()
+    return get_default_processes()
+
+
+def _prompt_processes(
+    input_func: Callable[[str], str] = input,
+    output_func: Callable[[str], None] = print,
+) -> list[Process]:
+    output_func("Modo interativo de cadastro")
+    output_func("Informe os processos manualmente. Para encerrar, deixe o nome em branco.")
+    output_func("Se nao informar chegada, o valor padrao sera 0.")
+    output_func("Convencao: numero maior = prioridade maior.")
+
+    processes: list[Process] = []
+    next_index = 1
+
+    while True:
+        name = input_func(f"\nNome da pessoa/processo P{next_index}: ").strip()
+        if not name:
+            if processes:
+                break
+            output_func("Pelo menos um processo precisa ser informado.")
+            continue
+
+        arrival_time = _prompt_int(
+            "Tempo de chegada [0]: ",
+            input_func=input_func,
+            output_func=output_func,
+            default=0,
+            min_value=0,
+        )
+        burst_time = _prompt_int(
+            "Tempo gasto (burst time): ",
+            input_func=input_func,
+            output_func=output_func,
+            min_value=1,
+        )
+        priority = _prompt_int(
+            "Prioridade (numero maior = prioridade maior): ",
+            input_func=input_func,
+            output_func=output_func,
+        )
+
+        processes.append(
+            Process(
+                id=f"P{next_index}",
+                name=name,
+                arrival_time=arrival_time,
+                burst_time=burst_time,
+                priority=priority,
+                original_index=next_index - 1,
+            )
+        )
+        next_index += 1
+
+    output_func("")
+    output_func(f"{len(processes)} processo(s) cadastrado(s).")
+    return processes
+
+
+def _prompt_int(
+    prompt: str,
+    input_func: Callable[[str], str],
+    output_func: Callable[[str], None],
+    default: int | None = None,
+    min_value: int | None = None,
+) -> int:
+    while True:
+        raw_value = input_func(prompt).strip()
+        if not raw_value and default is not None:
+            return default
+
+        try:
+            value = int(raw_value)
+        except ValueError:
+            output_func("Digite um numero inteiro valido.")
+            continue
+
+        if min_value is not None and value < min_value:
+            output_func(f"O valor deve ser maior ou igual a {min_value}.")
+            continue
+
+        return value
