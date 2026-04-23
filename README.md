@@ -1,6 +1,11 @@
 # Simulação Educacional de Escalonamento de CPU
 
-Este projeto foi desenvolvido para a disciplina de Sistemas Operacionais com foco na comparação entre dois algoritmos clássicos de escalonamento de CPU:
+Este projeto foi desenvolvido para a disciplina de Sistemas Operacionais com foco em duas etapas complementares:
+
+- **Parte 1**: comparação entre algoritmos clássicos de escalonamento de CPU;
+- **Parte 2**: demonstração de sincronização de threads com recursos compartilhados.
+
+Na parte 1, os algoritmos comparados são:
 
 - `SJF` (`Shortest Job First`)
 - `PS` (`Priority Scheduling`)
@@ -16,6 +21,12 @@ Comparar como `SJF` e `PS`, ambos na versão **não-preemptiva**, afetam:
 - turnaround;
 - tempo de resposta;
 - percepção de justiça entre processos curtos, longos e prioritários.
+
+Além disso, usar a fila gerada na parte 1 como entrada da parte 2 para demonstrar:
+
+- corrida critica sem sincronização;
+- proteção por `threading.Lock`;
+- consistência final de estoque e prontuário compartilhados.
 
 ## Algoritmos implementados
 
@@ -75,6 +86,30 @@ Quando nenhum processo está pronto no instante atual, a CPU é considerada ocio
 - na linha do tempo do algoritmo;
 - no gráfico de Gantt textual, por meio do bloco `IDLE`.
 
+## Parte 2: Sincronização de Threads
+
+A parte 2 simula vários médicos (threads) consumindo uma fila única de pacientes produzida a partir de um dos algoritmos da parte 1 (`SJF` ou `PS`).
+
+Recursos compartilhados simulados:
+
+- prontuário (lista de registros finais);
+- estoque de medicação.
+
+Dois cenários são executados no mesmo relatório:
+
+- **sem sincronização**: leitura/checagem/decremento/registro sem lock;
+- **com sincronização**: seção crítica protegida com `threading.Lock`.
+
+Para cada atendimento, o relatório mostra em terminal:
+
+- médico;
+- paciente;
+- quantidade solicitada;
+- estoque antes e depois;
+- status (`ATENDIDO` ou `SEM_RECURSO`).
+
+No final de cada cenário, é exibido um resumo com verificação automática de consistência.
+
 ## Estrutura do projeto
 
 ```text
@@ -82,6 +117,7 @@ project/
   main.py
   models.py
   schedulers.py
+  thread_sync.py
   metrics.py
   gantt.py
   sample_data.py
@@ -93,6 +129,7 @@ project/
     test_sjf.py
     test_ps.py
     test_metrics.py
+    test_thread_sync.py
 ```
 
 ## Como executar
@@ -118,6 +155,19 @@ Execução em modo interativo:
 ```bash
 python main.py --interactive
 ```
+
+Configurações da parte 2 (opcionais):
+
+```bash
+python main.py --sync-doctors 4 --sync-queue-source ps --sync-stock 12 --sync-seed 123
+```
+
+Parâmetros:
+
+- `--sync-doctors`: quantidade de médicos (threads) da parte 2;
+- `--sync-queue-source`: escolhe se a fila vem de `sjf` ou `ps`;
+- `--sync-stock`: estoque inicial (se omitido, é calculado automaticamente);
+- `--sync-seed`: seed opcional para reproduzir as requisições.
 
 No modo interativo, a CLI pede:
 

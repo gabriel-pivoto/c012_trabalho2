@@ -10,6 +10,12 @@ from metrics import build_average_rows, build_comparison_analysis, build_result_
 from models import Process, ScheduleResult
 from sample_data import get_default_processes, load_processes_from_json
 from schedulers import schedule_priority, schedule_sjf
+from thread_sync import (
+    build_patient_requests,
+    render_synchronization_report,
+    run_thread_synchronization_demo,
+    suggest_initial_stock,
+)
 
 
 Column = tuple[str, Callable[[Any], str], str]
@@ -30,20 +36,81 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Permite cadastrar processos manualmente pela CLI.",
     )
+
+    parser.add_argument(
+        "--sync-doctors",
+        type=int,
+        default=3,
+        help="Quantidade de medicos (threads) na parte 2.",
+    )
+    parser.add_argument(
+        "--sync-stock",
+        type=int,
+        default=None,
+        help="Estoque inicial para a parte 2. Se omitido, e calculado automaticamente.",
+    )
+    parser.add_argument(
+        "--sync-queue-source",
+        choices=("sjf", "ps"),
+        default="sjf",
+        help="Algoritmo da parte 1 usado como fila de pacientes para a parte 2.",
+    )
+    parser.add_argument(
+        "--sync-seed",
+        type=int,
+        default=None,
+        help="Seed opcional para reproduzir as requisicoes de recursos da parte 2.",
+    )
     return parser
 
 
 def run_cli(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     processes = _load_processes_from_cli(args)
-    report = build_report(processes)
+    report = build_report(
+        processes,
+        sync_queue_source=args.sync_queue_source,
+        sync_doctors=args.sync_doctors,
+        sync_stock=args.sync_stock,
+        sync_seed=args.sync_seed,
+    )
     print(report)
     return 0
 
 
-def build_report(processes: Sequence[Process]) -> str:
+def build_report(
+    processes: Sequence[Process],
+    sync_queue_source: str = "sjf",
+    sync_doctors: int = 3,
+    sync_stock: int | None = None,
+    sync_seed: int | None = None,
+) -> str:
     sjf_result = schedule_sjf(processes)
     ps_result = schedule_priority(processes)
+
+    selected_source = sync_queue_source.strip().lower()
+    if selected_source == "sjf":
+        queue_source_result = sjf_result
+    elif selected_source == "ps":
+        queue_source_result = ps_result
+    else:
+        raise ValueError("sync_queue_source invalido. Use 'sjf' ou 'ps'.")
+
+    patient_requests = build_patient_requests(queue_source_result, seed=sync_seed)
+    initial_stock = sync_stock if sync_stock is not None else suggest_initial_stock(patient_requests)
+    unsafe_result = run_thread_synchronization_demo(
+        patient_requests,
+        doctor_count=sync_doctors,
+        initial_stock=initial_stock,
+        use_lock=False,
+    )
+    safe_result = run_thread_synchronization_demo(
+        patient_requests,
+        doctor_count=sync_doctors,
+        initial_stock=initial_stock,
+        use_lock=True,
+    )
+
     lines: list[str] = [
         "SIMULACAO EDUCACIONAL DE ESCALONAMENTO DE CPU",
         "Analogia hospitalar opcional: nomes podem representar pacientes, mas a logica e de processos.",
@@ -58,6 +125,17 @@ def build_report(processes: Sequence[Process]) -> str:
         _section_title("Comparacao final"),
     ]
     lines.extend(f"- {line}" for line in build_comparison_analysis(processes, sjf_result, ps_result))
+    lines.extend(
+        [
+            "",
+            render_synchronization_report(
+                source_algorithm_name=queue_source_result.algorithm_name,
+                patient_requests=patient_requests,
+                unsafe_result=unsafe_result,
+                safe_result=safe_result,
+            ),
+        ]
+    )
     return "\n".join(lines)
 
 

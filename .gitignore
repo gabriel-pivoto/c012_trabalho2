@@ -22,3 +22,10 @@ htmlcov/
 .idea/
 Thumbs.db
 .DS_Store
+
+# Local study material and generated analysis artifacts
+material/
+material_ingestao_*.txt
+material_ingestao_*.json
+repo_analise_completa_sem_material.*
+_tmp_repo_analyze.py
