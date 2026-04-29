@@ -113,3 +113,72 @@ def _extract_life_time(item: dict[str, Any]) -> int:
     if "priority" in item:
         return int(item["priority"])
     raise KeyError("Cada processo precisa informar life_time ou tempo_de_vida.")
+
+
+def generate_random_processes(count: int = 5, seed: int | None = None) -> list[Process]:
+    """
+    Gera uma lista de processos aleatórios.
+    
+    Args:
+        count: Número de processos a gerar (padrão: 5)
+        seed: Seed para reprodutibilidade (None = aleatório)
+    
+    Returns:
+        Lista de processos aleatórios
+    """
+    import random
+    
+    if seed is not None:
+        random.seed(seed)
+    
+    # Nomes aleatórios
+    first_names = [
+        "Ana", "Bruno", "Carla", "Daniel", "Elisa", "Felipe", "Gabriela", "Henrique",
+        "Isabela", "João", "Karen", "Lucas", "Mariana", "Nicolas", "Olivia", "Paulo",
+        "Qualquer", "Rita", "Samuel", "Tania", "Ulisses", "Vanessa", "Wagner", "Yasmin"
+    ]
+    last_names = [
+        "Silva", "Santos", "Oliveira", "Souza", "Costa", "Pereira", "Martins", "Alves",
+        "Gomes", "Dias", "Ferreira", "Ribeiro", "Rocha", "Carvalho", "Monteiro"
+    ]
+    
+    severities = ["leve", "moderado", "grave"]
+    
+    processes_raw: list[dict[str, Any]] = []
+    
+    for i in range(count):
+        process_id = f"P{i+1}"
+        name = f"Paciente {random.choice(first_names)} {random.choice(last_names)}"
+        
+        # Maioria chega em tempo 0 (90%), alguns poucos em 1-2
+        if random.random() < 0.9:
+            arrival_time = 0
+        else:
+            arrival_time = random.randint(1, 2)
+        
+        # Tempo de burst: 1-5 unidades
+        burst_time = random.randint(1, 5)
+        
+        # Tempo de vida: baseado na severidade
+        severity = random.choice(severities)
+        if severity == "grave":
+            life_time = random.randint(1, 3)
+            max_wait = random.randint(1, 3)
+        elif severity == "moderado":
+            life_time = random.randint(4, 7)
+            max_wait = random.randint(4, 8)
+        else:  # leve
+            life_time = random.randint(8, 12)
+            max_wait = random.randint(10, 15)
+        
+        processes_raw.append({
+            "id": process_id,
+            "name": name,
+            "arrival_time": arrival_time,
+            "burst_time": burst_time,
+            "life_time": life_time,
+            "severity_label": severity,
+            "max_wait_tolerated": max_wait,
+        })
+    
+    return _build_processes(processes_raw)

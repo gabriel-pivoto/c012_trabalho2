@@ -71,7 +71,7 @@ def build_patient_requests(
 
     for record in source_schedule.records:
         process = record.process
-        max_units = max(1, min(6, process.burst_time + (1 if process.priority >= 7 else 0)))
+        max_units = max(1, min(6, process.burst_time))
         requested_units = rng.randint(1, max_units)
 
         requests.append(
@@ -100,6 +100,7 @@ def run_thread_synchronization_demo(
     doctor_count: int,
     initial_stock: int,
     use_lock: bool,
+    seed: int | None = None,
 ) -> SyncSimulationResult:
     if doctor_count <= 0:
         raise ValueError("doctor_count deve ser maior que zero")
