@@ -1,27 +1,28 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from statistics import median
 from typing import Iterable
 
-from models import ExecutionRecord, Process, ScheduleResult
+from models import Process, ScheduleResult
 
 
-def build_result_rows(result: ScheduleResult) -> list[dict[str, int | str]]:
-    rows: list[dict[str, int | str]] = []
-    for record in result.records:
+def build_result_rows(result: ScheduleResult) -> list[dict[str, int | str | None]]:
+    rows: list[dict[str, int | str | None]] = []
+    for patient_result in result.patient_results:
         rows.append(
             {
-                "id": record.process.id,
-                "name": record.process.name,
-                "arrival_time": record.process.arrival_time,
-                "burst_time": record.process.burst_time,
-                "priority": record.process.priority,
-                "start_time": record.start_time,
-                "finish_time": record.finish_time,
-                "waiting_time": record.waiting_time,
-                "turnaround_time": record.turnaround_time,
-                "response_time": record.response_time,
+                "id": patient_result.process.id,
+                "name": patient_result.process.name,
+                "arrival_time": patient_result.process.arrival_time,
+                "burst_time": patient_result.process.burst_time,
+                "life_time_initial": patient_result.life_time_initial,
+                "life_time_final": patient_result.life_time_final,
+                "start_time": patient_result.start_time,
+                "finish_time": patient_result.finish_time,
+                "waiting_time": patient_result.waiting_time,
+                "turnaround_time": patient_result.turnaround_time,
+                "response_time": patient_result.response_time,
+                "status_final": patient_result.status_final,
+                "death_time": patient_result.death_time,
             }
         )
     return rows
@@ -45,122 +46,92 @@ def build_comparison_analysis(
         return ["Nenhum processo foi informado para comparacao."]
 
     lines: list[str] = []
+    life_label = "algoritmo por menor tempo de vida"
+
+    if sjf_result.survived_count > ps_result.survived_count:
+        lines.append(
+            f"O SJF preservou mais pacientes vivos ({sjf_result.survived_count} contra {ps_result.survived_count})."
+        )
+        survival_winner = "SJF"
+    elif ps_result.survived_count > sjf_result.survived_count:
+        lines.append(
+            f"O {life_label} preservou mais pacientes vivos ({ps_result.survived_count} contra {sjf_result.survived_count})."
+        )
+        survival_winner = life_label
+    else:
+        lines.append(
+            f"Os dois algoritmos preservaram a mesma quantidade de pacientes vivos ({sjf_result.survived_count})."
+        )
+        survival_winner = "empate"
+
+    if sjf_result.deceased_count < ps_result.deceased_count:
+        lines.append(
+            f"O SJF teve menos mortes ({sjf_result.deceased_count} contra {ps_result.deceased_count})."
+        )
+    elif ps_result.deceased_count < sjf_result.deceased_count:
+        lines.append(
+            f"O {life_label} teve menos mortes ({ps_result.deceased_count} contra {sjf_result.deceased_count})."
+        )
+    else:
+        lines.append(
+            f"Os dois algoritmos tiveram o mesmo numero de mortes ({sjf_result.deceased_count})."
+        )
+
     sjf_avg = sjf_result.average_waiting_time
     ps_avg = ps_result.average_waiting_time
-
     if sjf_avg < ps_avg:
         lines.append(
-            f"O menor tempo medio de espera foi do SJF ({sjf_avg:.2f}), contra {ps_avg:.2f} no PS."
+            f"O menor tempo medio de espera entre os pacientes atendidos foi do SJF ({sjf_avg:.2f}), contra {ps_avg:.2f} no {life_label}."
         )
-        average_winner = sjf_result
-        average_winner_name = "SJF"
-        average_loser = ps_result
-        average_loser_name = "PS"
+        waiting_winner = "SJF"
     elif ps_avg < sjf_avg:
         lines.append(
-            f"O menor tempo medio de espera foi do PS ({ps_avg:.2f}), contra {sjf_avg:.2f} no SJF."
+            f"O menor tempo medio de espera entre os pacientes atendidos foi do {life_label} ({ps_avg:.2f}), contra {sjf_avg:.2f} no SJF."
         )
-        average_winner = ps_result
-        average_winner_name = "PS"
-        average_loser = sjf_result
-        average_loser_name = "SJF"
+        waiting_winner = life_label
     else:
         lines.append(
-            f"Os dois algoritmos empataram no tempo medio de espera ({sjf_avg:.2f})."
+            f"Os dois algoritmos empataram no tempo medio de espera entre os pacientes atendidos ({sjf_avg:.2f})."
         )
-        average_winner = sjf_result
-        average_winner_name = sjf_result.algorithm_name
-        average_loser = ps_result
-        average_loser_name = ps_result.algorithm_name
+        waiting_winner = "empate"
 
-    long_processes = _select_top_by_metric(processes_list, key=lambda process: process.burst_time)
-    long_descriptions: list[str] = []
-    for process in long_processes:
-        sjf_record = sjf_result.record_by_process_id()[process.id]
-        ps_record = ps_result.record_by_process_id()[process.id]
-        if sjf_record.waiting_time > ps_record.waiting_time:
-            long_descriptions.append(
-                f"{process.id} ({process.name}, burst={process.burst_time}) sofreu mais no SJF: espera {sjf_record.waiting_time} contra {ps_record.waiting_time} no PS"
-            )
-        elif ps_record.waiting_time > sjf_record.waiting_time:
-            long_descriptions.append(
-                f"{process.id} ({process.name}, burst={process.burst_time}) sofreu mais no PS: espera {ps_record.waiting_time} contra {sjf_record.waiting_time} no SJF"
-            )
-        else:
-            long_descriptions.append(
-                f"{process.id} ({process.name}, burst={process.burst_time}) teve a mesma espera nos dois algoritmos ({sjf_record.waiting_time})"
-            )
+    sjf_by_id = sjf_result.patient_result_by_process_id()
+    ps_by_id = ps_result.patient_result_by_process_id()
+    died_only_in_sjf = [
+        _describe_process(process)
+        for process in processes_list
+        if not sjf_by_id[process.id].survived and ps_by_id[process.id].survived
+    ]
+    died_only_in_life = [
+        _describe_process(process)
+        for process in processes_list
+        if sjf_by_id[process.id].survived and not ps_by_id[process.id].survived
+    ]
 
-    if long_descriptions:
-        lines.append("Entre os processos mais longos: " + "; ".join(long_descriptions) + ".")
-
-    high_priority_processes = _select_high_priority_processes(processes_list)
-    benefited: list[str] = []
-    not_benefited: list[str] = []
-
-    for process in high_priority_processes:
-        sjf_record = sjf_result.record_by_process_id()[process.id]
-        ps_record = ps_result.record_by_process_id()[process.id]
-        if ps_record.waiting_time < sjf_record.waiting_time:
-            benefited.append(
-                f"{process.id} ({process.name}) caiu de {sjf_record.waiting_time} para {ps_record.waiting_time} de espera"
-            )
-        elif ps_record.waiting_time > sjf_record.waiting_time:
-            not_benefited.append(
-                f"{process.id} ({process.name}) esperou {ps_record.waiting_time} no PS e {sjf_record.waiting_time} no SJF"
-            )
-
-    if benefited:
+    if died_only_in_sjf:
         lines.append(
-            "Processos de alta prioridade beneficiados no PS: " + "; ".join(benefited) + "."
-        )
-    else:
-        lines.append(
-            "Nenhum dos processos classificados como alta prioridade teve melhora de espera no PS em relacao ao SJF."
-        )
-
-    if not_benefited:
-        lines.append(
-            "Ainda assim, alta prioridade nao garante beneficio automatico: "
-            + "; ".join(not_benefited)
+            "Pacientes que morreram no SJF mas resistiram no algoritmo por menor tempo de vida: "
+            + "; ".join(died_only_in_sjf)
             + "."
         )
-
-    worse_under_average_winner: list[str] = []
-    winner_records = average_winner.record_by_process_id()
-    loser_records = average_loser.record_by_process_id()
-
-    for process in processes_list:
-        if winner_records[process.id].waiting_time > loser_records[process.id].waiting_time:
-            worse_under_average_winner.append(
-                f"{process.id} ({process.name})"
-            )
-
-    if worse_under_average_winner:
+    if died_only_in_life:
         lines.append(
-            f"Isto ilustra que menor media nao significa melhor para todos: embora {average_winner_name} reduza a media global, "
-            f"{', '.join(worse_under_average_winner)} teria(m) espera menor no {average_loser_name}."
+            "Pacientes que morreram no algoritmo por menor tempo de vida mas resistiram no SJF: "
+            + "; ".join(died_only_in_life)
+            + "."
+        )
+    if not died_only_in_sjf and not died_only_in_life:
+        lines.append("Os mesmos pacientes resistiram nos dois algoritmos.")
+
+    if survival_winner != "empate" and waiting_winner != "empate" and survival_winner != waiting_winner:
+        lines.append(
+            "Isto mostra que menor espera media nem sempre significa mais sobreviventes."
         )
 
     return lines
 
 
-def _select_top_by_metric(processes: list[Process], key: Callable[[Process], int]) -> list[Process]:
-    count = max(1, len(processes) // 3)
-    return sorted(
-        processes,
-        key=lambda process: (key(process), process.priority, -process.arrival_time),
-        reverse=True,
-    )[:count]
-
-
-def _select_high_priority_processes(processes: list[Process]) -> list[Process]:
-    if not processes:
-        return []
-
-    threshold = median(process.priority for process in processes)
-    return [
-        process
-        for process in processes
-        if process.priority >= threshold
-    ]
+def _describe_process(process: Process) -> str:
+    return (
+        f"{process.id} ({process.name}, burst={process.burst_time}, vida_inicial={process.life_time})"
+    )

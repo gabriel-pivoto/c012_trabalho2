@@ -12,8 +12,8 @@ DEFAULT_PROCESSES_RAW: list[dict[str, Any]] = [
         "id": "P1",
         "name": "Paciente Ana",
         "arrival_time": 0,
-        "burst_time": 10,
-        "priority": 9,
+        "burst_time": 3,
+        "life_time": 2,
         "severity_label": "grave",
         "max_wait_tolerated": 2,
     },
@@ -21,55 +21,37 @@ DEFAULT_PROCESSES_RAW: list[dict[str, Any]] = [
         "id": "P2",
         "name": "Paciente Bruno",
         "arrival_time": 0,
-        "burst_time": 2,
-        "priority": 3,
-        "severity_label": "leve",
-        "max_wait_tolerated": 8,
+        "burst_time": 3,
+        "life_time": 5,
+        "severity_label": "grave",
+        "max_wait_tolerated": 4,
     },
     {
         "id": "P3",
         "name": "Paciente Carla",
-        "arrival_time": 1,
+        "arrival_time": 0,
         "burst_time": 1,
-        "priority": 2,
+        "life_time": 9,
         "severity_label": "leve",
         "max_wait_tolerated": 10,
     },
     {
         "id": "P4",
         "name": "Paciente Daniel",
-        "arrival_time": 2,
-        "burst_time": 4,
-        "priority": 8,
-        "severity_label": "grave",
-        "max_wait_tolerated": 3,
+        "arrival_time": 1,
+        "burst_time": 1,
+        "life_time": 8,
+        "severity_label": "moderado",
+        "max_wait_tolerated": 9,
     },
     {
         "id": "P5",
         "name": "Paciente Elisa",
-        "arrival_time": 3,
-        "burst_time": 3,
-        "priority": 3,
-        "severity_label": "moderado",
-        "max_wait_tolerated": 6,
-    },
-    {
-        "id": "P6",
-        "name": "Paciente Fabio",
-        "arrival_time": 6,
-        "burst_time": 2,
-        "priority": 7,
+        "arrival_time": 10,
+        "burst_time": 1,
+        "life_time": 4,
         "severity_label": "moderado",
         "max_wait_tolerated": 4,
-    },
-    {
-        "id": "P7",
-        "name": "Paciente Gina",
-        "arrival_time": 25,
-        "burst_time": 2,
-        "priority": 5,
-        "severity_label": "moderado",
-        "max_wait_tolerated": 5,
     },
 ]
 
@@ -101,7 +83,7 @@ def _build_processes(items: list[dict[str, Any]]) -> list[Process]:
                 name=str(item["name"]),
                 arrival_time=int(item["arrival_time"]),
                 burst_time=int(item["burst_time"]),
-                priority=int(item["priority"]),
+                life_time=_extract_life_time(item),
                 severity_label=_optional_string(item.get("severity_label")),
                 max_wait_tolerated=_optional_int(item.get("max_wait_tolerated")),
                 original_index=index,
@@ -121,3 +103,13 @@ def _optional_int(value: Any) -> int | None:
     if value is None:
         return None
     return int(value)
+
+
+def _extract_life_time(item: dict[str, Any]) -> int:
+    if "life_time" in item:
+        return int(item["life_time"])
+    if "tempo_de_vida" in item:
+        return int(item["tempo_de_vida"])
+    if "priority" in item:
+        return int(item["priority"])
+    raise KeyError("Cada processo precisa informar life_time ou tempo_de_vida.")

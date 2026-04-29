@@ -23,7 +23,7 @@ Column = tuple[str, Callable[[Any], str], str]
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Simulacao didatica de escalonamento de CPU com SJF e Priority Scheduling."
+        description="Simulacao didatica de escalonamento de CPU com SJF e atendimento por menor tempo de vida."
     )
     source_group = parser.add_mutually_exclusive_group()
     source_group.add_argument(
@@ -114,6 +114,7 @@ def build_report(
     lines: list[str] = [
         "SIMULACAO EDUCACIONAL DE ESCALONAMENTO DE CPU",
         "Analogia hospitalar opcional: nomes podem representar pacientes, mas a logica e de processos.",
+        "Menor tempo de vida = maior urgencia; pacientes aguardando perdem vida com a passagem do tempo.",
         "",
         _section_title("Entrada original"),
         _render_input_table(processes),
@@ -142,10 +143,19 @@ def build_report(
 def _render_schedule_section(result: ScheduleResult) -> str:
     average_rows = build_average_rows(result)
     average_text = "\n".join(f"- {label}: {value:.2f}" for label, value in average_rows)
+    execution_order = " -> ".join(result.execution_order) if result.execution_order else "(nenhum paciente atendido)"
+    dead_patients = ", ".join(result.deceased_patient_ids) if result.deceased_patient_ids else "nenhum"
+    survival_text = "\n".join(
+        [
+            f"- Resistiram: {result.survived_count}",
+            f"- Nao resistiram: {result.deceased_count}",
+            f"- Pacientes que nao resistiram: {dead_patients}",
+        ]
+    )
 
     lines = [
         _section_title(result.algorithm_name),
-        f"Ordem de execucao: {' -> '.join(result.execution_order)}",
+        f"Ordem de execucao: {execution_order}",
         "Decisoes do escalonador:",
     ]
     lines.extend(f"- {decision}" for decision in result.decision_log)
@@ -160,6 +170,9 @@ def _render_schedule_section(result: ScheduleResult) -> str:
             "",
             "Medias:",
             average_text,
+            "",
+            "Sobrevivencia:",
+            survival_text,
         ]
     )
     return "\n".join(lines)
@@ -174,7 +187,7 @@ def _render_input_table(processes: Sequence[Process]) -> str:
         ("Nome", lambda process: process.name, "<"),
         ("Chegada", lambda process: str(process.arrival_time), ">"),
         ("Burst", lambda process: str(process.burst_time), ">"),
-        ("Prio", lambda process: str(process.priority), ">"),
+        ("Vida", lambda process: str(process.life_time), ">"),
     ]
 
     if include_severity:
@@ -194,12 +207,15 @@ def _render_result_table(result: ScheduleResult) -> str:
         ("Nome", lambda row: str(row["name"]), "<"),
         ("Chegada", lambda row: str(row["arrival_time"]), ">"),
         ("Burst", lambda row: str(row["burst_time"]), ">"),
-        ("Prio", lambda row: str(row["priority"]), ">"),
-        ("Inicio", lambda row: str(row["start_time"]), ">"),
-        ("Fim", lambda row: str(row["finish_time"]), ">"),
-        ("Espera", lambda row: str(row["waiting_time"]), ">"),
-        ("Turnaround", lambda row: str(row["turnaround_time"]), ">"),
-        ("Resposta", lambda row: str(row["response_time"]), ">"),
+        ("Vida Ini", lambda row: str(row["life_time_initial"]), ">"),
+        ("Vida Final", lambda row: str(row["life_time_final"]), ">"),
+        ("Inicio", lambda row: _format_optional_value(row["start_time"]), ">"),
+        ("Fim", lambda row: _format_optional_value(row["finish_time"]), ">"),
+        ("Espera", lambda row: _format_optional_value(row["waiting_time"]), ">"),
+        ("Turnaround", lambda row: _format_optional_value(row["turnaround_time"]), ">"),
+        ("Resposta", lambda row: _format_optional_value(row["response_time"]), ">"),
+        ("Morte em", lambda row: _format_optional_value(row["death_time"]), ">"),
+        ("Status", lambda row: str(row["status_final"]), "<"),
     ]
     return _render_table(rows, columns)
 
@@ -235,6 +251,10 @@ def _format_optional_int(value: int | None) -> str:
     return "-" if value is None else str(value)
 
 
+def _format_optional_value(value: Any) -> str:
+    return "-" if value is None else str(value)
+
+
 def _load_processes_from_cli(args: argparse.Namespace) -> list[Process]:
     if args.json:
         return load_processes_from_json(args.json)
@@ -250,7 +270,7 @@ def _prompt_processes(
     output_func("Modo interativo de cadastro")
     output_func("Informe os processos manualmente. Para encerrar, deixe o nome em branco.")
     output_func("Se nao informar chegada, o valor padrao sera 0.")
-    output_func("Convencao: numero maior = prioridade maior.")
+    output_func("Convencao: menor tempo de vida = maior urgencia.")
 
     processes: list[Process] = []
     next_index = 1
@@ -276,10 +296,11 @@ def _prompt_processes(
             output_func=output_func,
             min_value=1,
         )
-        priority = _prompt_int(
-            "Prioridade (numero maior = prioridade maior): ",
+        life_time = _prompt_int(
+            "Tempo de vida inicial (numero menor = maior urgencia): ",
             input_func=input_func,
             output_func=output_func,
+            min_value=0,
         )
 
         processes.append(
@@ -288,7 +309,7 @@ def _prompt_processes(
                 name=name,
                 arrival_time=arrival_time,
                 burst_time=burst_time,
-                priority=priority,
+                life_time=life_time,
                 original_index=next_index - 1,
             )
         )

@@ -32,12 +32,12 @@ class TestInteractiveCli(unittest.TestCase):
         self.assertEqual(processes[0].name, "Alice")
         self.assertEqual(processes[0].arrival_time, 0)
         self.assertEqual(processes[0].burst_time, 5)
-        self.assertEqual(processes[0].priority, 8)
+        self.assertEqual(processes[0].life_time, 8)
         self.assertEqual(processes[1].id, "P2")
         self.assertEqual(processes[1].name, "Bob")
         self.assertEqual(processes[1].arrival_time, 2)
         self.assertEqual(processes[1].burst_time, 1)
-        self.assertEqual(processes[1].priority, 3)
+        self.assertEqual(processes[1].life_time, 3)
         self.assertIn("2 processo(s) cadastrado(s).", messages)
 
 

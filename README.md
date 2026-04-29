@@ -1,4 +1,4 @@
-# Simulação Educacional de Escalonamento de CPU
+# Simulacao Educacional de Escalonamento de CPU
 
 Este projeto foi desenvolvido para a disciplina de Sistemas Operacionais com foco em duas etapas complementares:
 
@@ -8,15 +8,15 @@ Este projeto foi desenvolvido para a disciplina de Sistemas Operacionais com foc
 Na parte 1, os algoritmos comparados são:
 
 - `SJF` (`Shortest Job First`)
-- `PS` (`Priority Scheduling`)
+- `PS` adaptado para um cenario hospitalar com atendimento por menor tempo de vida
 
-O cenário textual usa pacientes como analogia para processos, mas a lógica implementada continua sendo a de uma simulação didática de escalonamento de CPU. O comportamento dos algoritmos depende apenas de `arrival_time`, `burst_time` e `priority`.
+O cenario textual usa pacientes como analogia para processos, mas a logica continua sendo a de uma simulacao educacional inspirada em escalonamento de CPU.
 
 ## Objetivo do trabalho
 
-Comparar como `SJF` e `PS`, ambos na versão **não-preemptiva**, afetam:
+Comparar como `SJF` e o algoritmo por menor tempo de vida, ambos na versao nao-preemptiva, afetam:
 
-- ordem de execução;
+- ordem de execucao;
 - tempo de espera;
 - turnaround;
 - tempo de resposta;
@@ -32,56 +32,73 @@ Além disso, usar a fila gerada na parte 1 como entrada da parte 2 para demonstr
 
 ### SJF
 
-O `Shortest Job First` escolhe, a cada decisão, o processo pronto com menor tempo de execução (`burst_time`).
+O `Shortest Job First` escolhe, a cada decisao, o paciente pronto e vivo com menor `burst_time`.
 
-Critérios de desempate adotados:
+Criterios de desempate adotados:
 
 1. menor `arrival_time`;
-2. maior `priority`;
+2. menor tempo de vida atual;
 3. ordem original de entrada.
 
-### PS
+### PS adaptado para menor tempo de vida
 
-O `Priority Scheduling` escolhe, a cada decisão, o processo pronto com maior prioridade.
+O segundo algoritmo ocupa o lugar do antigo `Priority Scheduling`, mas agora foi reinterpretado para o cenario hospitalar.
 
-Critérios de desempate adotados:
+Nesta adaptacao:
+
+- o antigo campo de prioridade foi substituido por `life_time`;
+- menor tempo de vida significa urgencia maior;
+- o paciente mais proximo de morrer deve ser atendido primeiro.
+
+Criterios de desempate adotados:
 
 1. menor `arrival_time`;
 2. menor `burst_time`;
 3. ordem original de entrada.
 
-## Convenção de prioridade adotada
+Importante: esta mecanica nao representa o `Priority Scheduling` classico da teoria. Trata-se de uma adaptacao didatica para o cenario hospitalar.
 
-Neste projeto, a convenção é:
+## Regra de tempo de vida
 
-- **quanto maior o número, maior a prioridade**
+Cada paciente entra no sistema com um tempo de vida inicial.
 
-Isso está explícito no código e no relatório para evitar ambiguidade, já que alguns materiais usam a convenção oposta.
+Durante a simulacao:
 
-## Métricas calculadas
+- pacientes aguardando perdem tempo de vida com a passagem do tempo;
+- pacientes que ainda nao chegaram nao perdem tempo de vida antes do `arrival_time`;
+- o paciente que esta em atendimento nao perde tempo de vida durante a propria consulta;
+- se o tempo de vida chegar a `0`, o paciente nao resiste e sai da simulacao;
+- pacientes mortos nao sao escalonados depois.
 
-Para cada processo:
+## Metricas calculadas
 
-- `arrival_time`: instante em que o processo entra na fila de prontos;
-- `burst_time`: tempo de CPU necessário;
-- `priority`: importância relativa usada pelo `PS`;
-- `start_time`: instante em que a execução começa;
-- `finish_time`: instante em que a execução termina;
-- `waiting_time`: tempo total na fila antes da execução;
-- `turnaround_time`: `finish_time - arrival_time`;
-- `response_time`: `start_time - arrival_time`.
+Para cada paciente:
 
-Como a implementação é não-preemptiva, `waiting_time` e `response_time` coincidem nesta simulação, mas ambos são exibidos separadamente por valor didático.
+- `arrival_time`
+- `burst_time`
+- `life_time` inicial
+- `life_time` final
+- `start_time`
+- `finish_time`
+- `waiting_time`
+- `turnaround_time`
+- `response_time`
+- `status_final`
+- `death_time`, quando houver
 
-Também são calculadas as médias de:
+Tambem sao calculadas, por algoritmo:
 
-- tempo de espera;
-- turnaround;
-- tempo de resposta.
+- tempo medio de espera entre os pacientes atendidos;
+- tempo medio de turnaround entre os pacientes atendidos;
+- tempo medio de resposta entre os pacientes atendidos;
+- quantidade de pacientes que resistiram;
+- quantidade de pacientes que nao resistiram.
 
 ## CPU ociosa
 
-Quando nenhum processo está pronto no instante atual, a CPU é considerada ociosa e o tempo avança até o próximo `arrival_time`. Isso aparece:
+Quando nenhum paciente vivo esta pronto no instante atual, a CPU fica ociosa ate o proximo `arrival_time`.
+
+Isso aparece:
 
 - na linha do tempo do algoritmo;
 - no gráfico de Gantt textual, por meio do bloco `IDLE`.
@@ -138,19 +155,19 @@ Requisitos:
 
 - Python `3.11+`
 
-Execução com o conjunto padrão:
+Execucao com o conjunto padrao:
 
 ```bash
 python main.py
 ```
 
-Execução carregando um JSON:
+Execucao carregando um JSON:
 
 ```bash
 python main.py --json data/example_processes.json
 ```
 
-Execução em modo interativo:
+Execucao em modo interativo:
 
 ```bash
 python main.py --interactive
@@ -172,9 +189,9 @@ Parâmetros:
 No modo interativo, a CLI pede:
 
 - nome da pessoa/processo;
-- tempo de chegada (opcional, com padrão `0`);
+- tempo de chegada, opcional, com padrao `0`;
 - tempo gasto (`burst_time`);
-- prioridade.
+- tempo de vida inicial.
 
 Executando os testes:
 
@@ -184,7 +201,9 @@ python -m unittest discover -s tests -v
 
 ## Formato do JSON opcional
 
-O arquivo JSON deve conter uma lista de objetos:
+O arquivo JSON pode usar `life_time` como campo principal. Tambem ha compatibilidade com `tempo_de_vida` e com o campo antigo `priority`.
+
+Exemplo:
 
 ```json
 [
@@ -192,82 +211,73 @@ O arquivo JSON deve conter uma lista de objetos:
     "id": "P1",
     "name": "Paciente Ana",
     "arrival_time": 0,
-    "burst_time": 10,
-    "priority": 9,
+    "burst_time": 3,
+    "life_time": 2,
     "severity_label": "grave",
     "max_wait_tolerated": 2
   }
 ]
 ```
 
-Os campos opcionais são apenas narrativos e **não alteram a lógica de scheduling**.
+Os campos opcionais sao apenas narrativos e nao alteram a logica do escalonamento.
 
 ## Conjunto de dados de exemplo
 
-O conjunto padrão foi escolhido para evidenciar o contraste entre:
+O conjunto padrao foi ajustado para evidenciar a nova regra:
 
-- favorecer processos curtos, como no `SJF`;
-- favorecer processos importantes, como no `PS`.
+- um paciente com burst curto e vida alta;
+- um paciente com burst mais longo e vida muito baixa;
+- situacoes em que o `SJF` reduz a espera media;
+- situacoes em que o algoritmo por menor tempo de vida preserva mais pacientes vivos.
 
-Ele inclui:
+## Discussao breve dos resultados
 
-- um processo muito prioritário e longo;
-- vários processos curtos;
-- tempos de chegada diferentes;
-- um trecho com `IDLE` para mostrar CPU ociosa.
+No conjunto padrao:
 
-## Discussão breve dos resultados
+- o `SJF` tende a reduzir o tempo medio de espera ao priorizar consultas curtas;
+- o algoritmo por menor tempo de vida tende a salvar pacientes mais urgentes;
+- menor espera media nem sempre significa melhor resultado de sobrevivencia.
 
-No conjunto padrão:
+Esse contraste ajuda a visualizar o conflito entre eficiencia media e urgencia clinica no cenario adaptado.
 
-- o `SJF` tende a reduzir o tempo médio de espera ao priorizar rajadas curtas;
-- o `PS` beneficia fortemente processos muito prioritários;
-- nem sempre o algoritmo com melhor média é o melhor para todos os processos.
+## Limitacoes da simulacao
 
-Um processo longo e muito prioritário pode começar imediatamente em `PS`, mas esperar bastante em `SJF`. Em compensação, processos curtos costumam sofrer menos em `SJF`.
+- A implementacao e nao-preemptiva.
+- O projeto nao modela troca de contexto, I/O, multiplos nucleos ou bloqueios.
+- A regra de tempo de vida e uma adaptacao didatica do problema.
+- O antigo `PS` foi reinterpretado para o cenario hospitalar e nao corresponde ao algoritmo teorico classico.
 
-## Limitações da simulação
+## Possiveis extensoes futuras
 
-- A implementação é **não-preemptiva**, portanto um processo escolhido mantém a CPU até terminar.
-- O projeto não modela troca de contexto, I/O, múltiplos núcleos ou bloqueios.
-- `Priority Scheduling` pode sofrer com **starvation**: processos de baixa prioridade podem esperar indefinidamente se chegarem processos mais prioritários com frequência.
-- O cenário hospitalar é apenas uma narrativa de apoio; a simulação representa conceitos de escalonamento de processos.
+- versao preemptiva de `SJF` (`SRTF`);
+- mecanismo de `aging`;
+- comparacao com `FCFS` e `Round Robin`;
+- exportacao de resultados para `CSV`.
 
-## Possíveis extensões futuras
-
-- versão preemptiva de `SJF` (`SRTF`);
-- versão preemptiva de `PS`;
-- mecanismo de `aging` no `PS`;
-- comparação com `FCFS` e `Round Robin`;
-- exportação de resultados para `CSV`.
-
-## Exemplo resumido de saída
+## Exemplo resumido de saida
 
 ```text
-SIMULAÇÃO EDUCACIONAL DE ESCALONAMENTO DE CPU
-Analogia hospitalar opcional: nomes podem representar pacientes, mas a lógica é de processos.
+SIMULACAO EDUCACIONAL DE ESCALONAMENTO DE CPU
+Analogia hospitalar opcional: nomes podem representar pacientes, mas a logica e de processos.
+Menor tempo de vida = maior urgencia; pacientes aguardando perdem vida com a passagem do tempo.
 
 Entrada original
----------------
-ID | Nome          | Chegada | Burst | Prio
----+---------------+---------+-------+-----
-P1 | Paciente Ana  |       0 |    10 |    9
-P2 | Paciente Bruno|       0 |     2 |    3
+----------------
+ID | Nome            | Chegada | Burst | Vida
+---+-----------------+---------+-------+-----
+P1 | Paciente Ana    |       0 |     3 |    2
+P2 | Paciente Bruno  |       0 |     3 |    5
 ...
 
-SJF (não-preemptivo)
+SJF (nao-preemptivo)
 --------------------
-Ordem de execução: P2 -> P3 -> P5 -> P6 -> P4 -> P1 -> P7
-| P2 | P3 | P5 | P6 | P4 | P1 | IDLE | P7 |
-0    2    3    6    8    12   22     25   27
+Ordem de execucao: P3 -> P4 -> P2 -> P5
 
-PS (não-preemptivo)
--------------------
-Ordem de execução: P1 -> P4 -> P6 -> P2 -> P5 -> P3 -> P7
-| P1 | P4 | P6 | P2 | P5 | P3 | IDLE | P7 |
-0    10   14   16   18   21   22     25   27
+PS adaptado (menor tempo de vida)
+---------------------------------
+Ordem de execucao: P1 -> P2 -> P3 -> P4 -> P5
 ```
 
-## Observação final
+## Observacao final
 
-Este projeto é uma **simulação educacional inspirada nos conceitos de escalonamento de processos da disciplina de Sistemas Operacionais**. O objetivo central é didático: visualizar como diferentes políticas de seleção afetam métricas e percepção de justiça no uso da CPU.
+Este projeto continua sendo uma simulacao educacional inspirada nos conceitos de escalonamento de processos da disciplina de Sistemas Operacionais, com uma adaptacao hospitalar baseada em tempo de vida para tornar o comportamento dos algoritmos mais intuitivo no relatorio final.

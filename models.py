@@ -10,7 +10,7 @@ class Process:
     name: str
     arrival_time: int
     burst_time: int
-    priority: int
+    life_time: int
     severity_label: str | None = None
     max_wait_tolerated: int | None = None
     original_index: int = field(default=0, compare=False)
@@ -20,6 +20,8 @@ class Process:
             raise ValueError(f"arrival_time invalido para {self.id}: {self.arrival_time}")
         if self.burst_time <= 0:
             raise ValueError(f"burst_time invalido para {self.id}: {self.burst_time}")
+        if self.life_time < 0:
+            raise ValueError(f"life_time invalido para {self.id}: {self.life_time}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,6 +32,28 @@ class ExecutionRecord:
     waiting_time: int
     turnaround_time: int
     response_time: int
+
+
+@dataclass(frozen=True, slots=True)
+class PatientResult:
+    process: Process
+    life_time_initial: int
+    life_time_final: int
+    survived: bool
+    start_time: int | None = None
+    finish_time: int | None = None
+    waiting_time: int | None = None
+    turnaround_time: int | None = None
+    response_time: int | None = None
+    death_time: int | None = None
+
+    @property
+    def status_final(self) -> str:
+        return "RESISTIU" if self.survived else "NAO RESISTIU"
+
+    @property
+    def was_attended(self) -> bool:
+        return self.start_time is not None
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +68,7 @@ class GanttBlock:
 class ScheduleResult:
     algorithm_name: str
     records: tuple[ExecutionRecord, ...]
+    patient_results: tuple[PatientResult, ...]
     gantt_blocks: tuple[GanttBlock, ...]
     decision_log: tuple[str, ...]
 
@@ -69,8 +94,23 @@ class ScheduleResult:
             return 0.0
         return sum(record.response_time for record in self.records) / len(self.records)
 
+    @property
+    def survived_count(self) -> int:
+        return sum(1 for result in self.patient_results if result.survived)
+
+    @property
+    def deceased_count(self) -> int:
+        return len(self.patient_results) - self.survived_count
+
+    @property
+    def deceased_patient_ids(self) -> tuple[str, ...]:
+        return tuple(result.process.id for result in self.patient_results if not result.survived)
+
     def record_by_process_id(self) -> dict[str, ExecutionRecord]:
         return {record.process.id: record for record in self.records}
+
+    def patient_result_by_process_id(self) -> dict[str, PatientResult]:
+        return {result.process.id: result for result in self.patient_results}
 
 
 def normalize_processes(processes: Sequence[Process]) -> list[Process]:
