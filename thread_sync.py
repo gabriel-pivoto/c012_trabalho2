@@ -7,7 +7,7 @@ from threading import Lock, Thread
 from time import sleep
 from typing import Sequence
 
-from models import ScheduleResult
+from models import Process, ScheduleResult
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +72,8 @@ def build_patient_requests(
     for record in source_schedule.records:
         process = record.process
         max_units = max(1, min(6, process.burst_time))
+        urgency_bonus = 1 if _is_high_urgency(process) else 0
+        max_units = max(1, min(6, process.burst_time + urgency_bonus))
         requested_units = rng.randint(1, max_units)
 
         requests.append(
@@ -85,6 +87,13 @@ def build_patient_requests(
         )
 
     return requests
+
+
+def _is_high_urgency(process: Process) -> bool:
+    max_wait = process.max_wait_tolerated
+    if max_wait is not None:
+        return max_wait <= process.burst_time + 1
+    return process.life_time <= process.burst_time + 1
 
 
 def suggest_initial_stock(patient_requests: Sequence[PatientRequest]) -> int:
