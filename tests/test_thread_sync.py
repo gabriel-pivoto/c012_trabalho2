@@ -15,9 +15,9 @@ from thread_sync import (
 class TestThreadSynchronization(unittest.TestCase):
     def test_build_patient_requests_is_reproducible_with_seed(self) -> None:
         processes = [
-            Process(id="P1", name="A", arrival_time=0, burst_time=5, priority=9),
-            Process(id="P2", name="B", arrival_time=1, burst_time=2, priority=4),
-            Process(id="P3", name="C", arrival_time=2, burst_time=3, priority=7),
+            Process(id="P1", name="A", arrival_time=0, burst_time=5, life_time=2),
+            Process(id="P2", name="B", arrival_time=1, burst_time=2, life_time=6),
+            Process(id="P3", name="C", arrival_time=2, burst_time=3, life_time=3),
         ]
         source = schedule_sjf(processes)
 
